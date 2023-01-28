@@ -1,0 +1,405 @@
+#!/usr/bin/python3
+# -*- encoding_utf-8 -*-
+import sys
+sys.setrecursionlimit(5000) #为了用pyinstaller生产exe添加
+if hasattr(sys, 'frozen'):	#为了生产exe添加
+    os.environ['PATH'] = sys._MEIPASS + ";" + os.environ['PATH']
+from PyQt5.QtWidgets import (QToolButton, QFrame, QVBoxLayout, QHBoxLayout, QGridLayout,
+                             QApplication, QTextEdit, QSizePolicy, QLineEdit)
+from PyQt5.QtGui import QIntValidator, QTextOption, QTextCursor
+from sympy import symbols, Matrix, solve, diff, eye
+
+class Button(QToolButton):
+    def __init__(self, text, parent=None):
+        super(Button, self).__init__(parent)
+
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        self.setText(text)
+
+    def sizeHint(self):
+        size = super(Button, self).sizeHint()
+        size.setHeight(size.height() + 50)
+        size.setWidth(max(size.width(), size.height()))
+        return size     
+        
+class Calc(QFrame):
+    NumDigitButtons = 10
+    def __init__(self):
+        super().__init__()
+        self.initData()
+        self.initUI()
+        self.initConnect()
+
+    def initData(self):
+        pass
+
+    def initUI(self):
+        self.layout = QVBoxLayout()
+        self.createDisplayBox()
+        self.createInputBox()
+
+        self.setLayout(self.layout)
+        self.show()
+
+    def initConnect(self):
+        self.input.textChanged.connect(self.cursorChange)
+
+    def cursorChange(self):
+        print('cursorChange')
+        cursor =  self.input.textCursor()
+        cursor.movePosition(QTextCursor.End)
+        self.input.setTextCursor(cursor)
+
+    def createDisplayBox(self):
+        layout = QHBoxLayout()
+        self.input = QTextEdit()
+        self.output = QTextEdit()
+        self.output.setReadOnly(True) 
+        self.output.setWordWrapMode(QTextOption.NoWrap)
+
+        layout.addWidget(self.input)
+        layout.addWidget(self.output)
+        layout.setStretch(1.5, 1)
+        self.layout.addLayout(layout)
+
+    def createInputBox(self):
+        layout = QGridLayout()
+        self.digitButtons = []
+        for i in range(Calc.NumDigitButtons):
+            self.digitButtons.append(self.createButton(str(i),
+                    self.digitClicked))
+
+        self.reverseButton = self.createButton("求逆",
+                self.reverseOperateClicked)
+        self.powButton =  self.createButton("次方:",
+                self.powOperatorClicked)
+        self.powLineEdit = QLineEdit()
+        self.powLineEdit.setValidator(QIntValidator())
+        self.transposeButton =  self.createButton("转置",
+                self.transposeOperatorClicked)
+        self.eigenvectButton = self.createButton("特征向量",
+                self.eigenvectOperatorClicked)
+        self.eigenvalButton = self.createButton("特征值",
+                self.eigenvalOperatorClicked)
+        self.rankButton = self.createButton("秩",
+                self.rankOperatorClicked)
+        self.detButton = self.createButton("行列式",
+                self.detOperatorClicked)
+        self.rrefButton = self.createButton("最简型",
+                self.rrefOperatorClicked)
+        self.blankSpaceButton = self.createButton(" ",
+                self.balnkOperatorClicked)
+        self.EnterButton = self.createButton("Enter",
+                self.EnterOperatorClicked)
+        self.clearButton = self.createButton("Clear",
+                self.clearOperatorClicked)
+        self.minusButton = self.createButton("-",
+                self.minuxOperatorClicked)
+
+
+        for i in range(1, Calc.NumDigitButtons):
+            row = ((9 - i) / 3) + 2
+            column = ((i - 1) % 3) + 1
+            layout.addWidget(self.digitButtons[i], row, column)
+        layout.addWidget(self.digitButtons[0], 5, 1)
+        layout.addWidget(self.reverseButton, 2, 4)
+        layout.addWidget(self.powButton, 1, 1)
+        layout.addWidget(self.powLineEdit,1, 2, 1, 2)
+        layout.addWidget(self.transposeButton, 1, 4)
+        layout.addWidget(self.eigenvectButton, 3, 5)
+        layout.addWidget(self.eigenvalButton, 4, 5)
+        layout.addWidget(self.rankButton, 3, 4)
+        layout.addWidget(self.detButton, 1, 5)
+        layout.addWidget(self.rrefButton, 2, 5)
+        layout.addWidget(self.blankSpaceButton, 5, 2, 1, 2)
+        layout.addWidget(self.EnterButton, 4, 4)
+        layout.addWidget(self.clearButton, 5, 5)
+        layout.addWidget(self.minusButton, 5, 4)
+        self.layout.addLayout(layout)
+
+    def formateInput(self, inputText):
+        inputText.strip()
+        print("inputText", inputText, type(inputText))
+        inputText += ' \n'
+        listForMat = list()
+        templist = list()
+        currentNum = ''
+        for char in inputText:
+            print(char)
+            if char.isalnum():
+                currentNum += char
+
+            if char == '-':
+                currentNum += char 
+
+            if char.isspace():
+                if currentNum.isalnum() or currentNum[1:].isalnum():
+                    templist.append(int(currentNum))
+                currentNum = ''
+
+            if char == '\n' and len(templist) != 0:
+                listForMat.append(templist)
+                templist = []
+
+        return listForMat
+
+    def formatOutput(self, matrix):
+        output = ''
+        row, column = matrix.shape
+        print(column)
+        count = 0
+        for i in matrix:
+
+            print(count)
+            if count % column == 0 and count != 0:
+                output += '\n' 
+            output += str(i) + '  '
+            count += 1
+        return output
+
+    def reverseOperateClicked(self):
+        text = self.input.toPlainText()
+        print('text :', text)
+        listForMat = self.formateInput(text)
+        print(listForMat)
+        A = Matrix(listForMat)
+        # 不是方阵或者不满秩 无法求逆
+        if A.shape[0] != A.shape[1] or A.rank() != A.shape[0]:
+            self.abortOperation()
+            return
+        reverse_A = A ** -1
+        output = self.formatOutput(reverse_A)
+
+        self.output.setPlainText(output)
+
+    def abortOperation(self):
+        self.output.setPlainText("####")
+
+    def powOperatorClicked(self):
+        n = self.powLineEdit.text()
+        if n.isalnum():
+            text = self.input.toPlainText()
+            listForMat = self.formateInput(text)
+            A = Matrix(listForMat)
+
+            # 不是方阵没法求次方
+            if A.shape[0] != A.shape[1]:
+                self.abortOperation()
+                return
+            output = ''
+            output_forhuman = ''
+            eigenvalmap =  A.eigenvals()
+            iseigenvals_int = True
+
+            for key in eigenvalmap.keys():
+                if key % 1 != 0:
+                    print('isinstance(key, int):', key)
+                    iseigenvals_int = False
+                    break
+
+            if iseigenvals_int and A.rank() > 1:
+                try:
+                    answer = pow_Matrix(A, int(n))
+                    A = answer[0]
+                    output_forhuman = str(answer[1])
+                    output = output_forhuman + '\n \n' 
+
+                except Exception:
+                    A = A ** int(n)
+            else: 
+                A = A ** int(n)          
+            output += self.formatOutput(A)
+            self.output.setPlainText(output)
+
+    def transposeOperatorClicked(self):
+        text = self.input.toPlainText()
+        print('text :', text)
+        listForMat = self.formateInput(text)
+        print(listForMat)
+        A = Matrix(listForMat)
+        print(A)
+        A = Matrix(A)
+        transpose_A = A.T
+        output = self.formatOutput(transpose_A)
+
+        self.output.setPlainText(output)
+
+    def eigenvectOperatorClicked(self):
+        text = self.input.toPlainText()
+        listForMat = self.formateInput(text)
+        A = Matrix(listForMat)
+        # 不是方正没法求特征向量
+        if A.shape[0] != A.shape[1]:
+            self.abortOperation()
+            return
+        eigenvectList = A.eigenvects()
+        output = ''
+        for i in range(len(eigenvectList)):
+            output += '特征值:' + str(eigenvectList[i][0])
+            output += ' ,数量:' + str(eigenvectList[i][1])
+            output += ' ,特征向量: \n'
+            for j in range(len(eigenvectList[i][2])):# 可能有多个特征向量
+                output += self.formatOutput(eigenvectList[i][2][j]) + ' '
+                output += '\n \n'
+            output += '\n'
+
+        self.output.setPlainText(output)
+
+    def eigenvalOperatorClicked(self):
+        text = self.input.toPlainText()
+        listForMat = self.formateInput(text)
+        A = Matrix(listForMat)
+        # 不是方正没法求特征值
+        if A.shape[0] != A.shape[1]:
+            self.abortOperation()
+            return
+        eigenvalmap = A.eigenvals()
+        output = ''
+        for val, num in eigenvalmap.items():
+            for i in range(num):
+                output += str(val) + ' '
+        self.output.setPlainText(output)
+
+    def rankOperatorClicked(self):
+        text = self.input.toPlainText()
+        listForMat = self.formateInput(text)
+        A = Matrix(listForMat)
+
+        rank = A.rank()
+        output = str(rank)
+        self.output.setPlainText(output)
+
+    def detOperatorClicked(self):
+        text = self.input.toPlainText()
+        listForMat = self.formateInput(text)
+        A = Matrix(listForMat)
+        # 不是方正没法求行列式
+        if A.shape[0] != A.shape[1]:
+            self.abortOperation()
+            return
+        det = A.det()
+        output = str(det)
+        self.output.setPlainText(output)
+
+    def rrefOperatorClicked(self):
+        text = self.input.toPlainText()
+        listForMat = self.formateInput(text)
+        A = Matrix(listForMat)
+
+        rrf_matrix = A.rref()[0]
+        output = self.formatOutput(rrf_matrix)
+        self.output.setPlainText(output)
+
+    def balnkOperatorClicked(self):
+        text = self.input.toPlainText()
+        text += ' '
+        self.input.setPlainText(text)
+
+    def EnterOperatorClicked(self):
+        text = self.input.toPlainText()
+        text += '\n'
+        self.input.setPlainText(text)
+
+    def minuxOperatorClicked(self):
+        text = self.input.toPlainText()
+        text += '-'
+        self.input.setPlainText(text)
+
+    def clearOperatorClicked(self):
+        self.output.setPlainText('')
+        self.input.setPlainText('')
+        self.powLineEdit.setText('')
+
+    def createButton(self, text, member):
+        button = Button(text)
+        button.clicked.connect(member)
+        return button
+
+    def digitClicked(self):
+        clickedButton = self.sender()
+        digitValue = int(clickedButton.text())
+        self.input.setPlainText(self.input.toPlainText() + str(digitValue))
+
+
+def getYuExpression(n):
+    # 确定特征值后获取余数的表达式
+     # 次数比特征值次数少1,而range默认如取到倒数第二个
+    symbolsList = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k']
+    expression = symbols(symbolsList[0])
+    for i in range(1, n):
+        expression += symbols(symbolsList[i]) * symbols("x") ** (i)
+    print('expression:', expression)
+    return expression
+
+def findSame(numlist):
+    '''
+    输入特征值图
+    输出最多的重复次数的数字，和最多重复次数
+    '''
+    maxSame = 0 
+    for tzz, same_num in numlist.items():
+        if maxSame < same_num:
+            maxSame = same_num
+            maxSameNum = tzz
+    return maxSameNum, maxSame
+
+def calEquation(A, expression, tzz, same_num, same_nums):
+    expressionList = list()
+    for key in tzz.keys():
+        expressionList.append(expression.subs('x', key))
+
+    for i in range(same_nums - 1):
+        dify = diff(expression, symbols('x'))
+        expression = dify
+        print('dify :', dify)
+        expressionList.append(dify.subs('x', same_num))
+    print('expressionList: ', expressionList)
+
+    # 用sympy.solve 求解方程组
+    answers = solve(expressionList)
+    print('answers', answers)
+
+    answerList = list()
+    human_answerList = list()
+
+    # 用列表格式化a,b,c..
+
+    for key, value in answers.items():
+        if key == symbols('a'):
+            human_answerList.append((key, value))
+            size = A.rank()
+            value = value * eye(size)
+            answerList.append((key, value))
+        else:
+            answerList.append((key, value))
+            human_answerList.append((key, value))
+
+    # 列表中添加变量x的值为A
+    answerList.append((symbols('x'), A))
+    return (answerList, human_answerList)
+
+def pow_Matrix(A, n): 
+    tzz = A.eigenvals()  # "返回值为一个字典，特征值：根的重数"
+    rank = A.rank()  # 获得矩阵A的秩
+    yu_expression = getYuExpression(rank)  # 获得余数的表达式
+
+    same_num, same_nums = findSame(tzz)
+    print('same_num:', same_num, '  same_nums:', same_nums)
+
+    expression = symbols("x") ** n - yu_expression
+    print(expression)
+    # 例如 记录了变量 a,b 的值
+    result = calEquation(A, expression, tzz, same_num, same_nums)
+    answerList = result[0]
+    human_answeList = result[1]
+    print('answerList :', answerList)
+    answer = yu_expression.subs(answerList)
+    print('answer: ', answer)
+    human_answer = yu_expression.subs(human_answeList)
+    return (answer, human_answer)
+
+
+if __name__ == '__main__':
+    app = QApplication(sys.argv)
+    calc = Calc()
+    sys.exit(app.exec_())
