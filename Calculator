@@ -1,8 +1,8 @@
 #!/usr/bin/python3
 # -*- encoding_utf-8 -*-
 import sys
-sys.setrecursionlimit(5000) #为了用pyinstaller生产exe添加
-if hasattr(sys, 'frozen'):	#为了生产exe添加
+sys.setrecursionlimit(5000) #use pyinstaller to prodec exe
+if hasattr(sys, 'frozen'):	#in order to produce exe
     os.environ['PATH'] = sys._MEIPASS + ";" + os.environ['PATH']
 from PyQt5.QtWidgets import (QToolButton, QFrame, QVBoxLayout, QHBoxLayout, QGridLayout,
                              QApplication, QTextEdit, QSizePolicy, QLineEdit)
@@ -163,7 +163,7 @@ class Calc(QFrame):
         listForMat = self.formateInput(text)
         print(listForMat)
         A = Matrix(listForMat)
-        # 不是方阵或者不满秩 无法求逆
+        # not an equation or not a rank
         if A.shape[0] != A.shape[1] or A.rank() != A.shape[0]:
             self.abortOperation()
             return
@@ -228,7 +228,7 @@ class Calc(QFrame):
         text = self.input.toPlainText()
         listForMat = self.formateInput(text)
         A = Matrix(listForMat)
-        # 不是方正没法求特征向量
+        # not founder can not produce eigenvector
         if A.shape[0] != A.shape[1]:
             self.abortOperation()
             return
@@ -238,7 +238,7 @@ class Calc(QFrame):
             output += '特征值:' + str(eigenvectList[i][0])
             output += ' ,数量:' + str(eigenvectList[i][1])
             output += ' ,特征向量: \n'
-            for j in range(len(eigenvectList[i][2])):# 可能有多个特征向量
+            for j in range(len(eigenvectList[i][2])):# it could be other eigenvectors
                 output += self.formatOutput(eigenvectList[i][2][j]) + ' '
                 output += '\n \n'
             output += '\n'
@@ -249,7 +249,7 @@ class Calc(QFrame):
         text = self.input.toPlainText()
         listForMat = self.formateInput(text)
         A = Matrix(listForMat)
-        # 不是方正没法求特征值
+        # not founder can not produce eigenvector
         if A.shape[0] != A.shape[1]:
             self.abortOperation()
             return
@@ -273,7 +273,7 @@ class Calc(QFrame):
         text = self.input.toPlainText()
         listForMat = self.formateInput(text)
         A = Matrix(listForMat)
-        # 不是方正没法求行列式
+        # not founder can not produce eigenvector
         if A.shape[0] != A.shape[1]:
             self.abortOperation()
             return
@@ -322,8 +322,8 @@ class Calc(QFrame):
 
 
 def getYuExpression(n):
-    # 确定特征值后获取余数的表达式
-     # 次数比特征值次数少1,而range默认如取到倒数第二个
+    # obtain remainder expression after eigenvalue is determined 
+     # the degree is 1 less than the eigenvalue and you get to the penultimate
     symbolsList = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k']
     expression = symbols(symbolsList[0])
     for i in range(1, n):
@@ -333,8 +333,8 @@ def getYuExpression(n):
 
 def findSame(numlist):
     '''
-    输入特征值图
-    输出最多的重复次数的数字，和最多重复次数
+    output eigenvalue graph
+    output the number and times of the maximum number of repetitions
     '''
     maxSame = 0 
     for tzz, same_num in numlist.items():
@@ -355,14 +355,14 @@ def calEquation(A, expression, tzz, same_num, same_nums):
         expressionList.append(dify.subs('x', same_num))
     print('expressionList: ', expressionList)
 
-    # 用sympy.solve 求解方程组
+    # use sympy.solve to solve a system of equations
     answers = solve(expressionList)
     print('answers', answers)
 
     answerList = list()
     human_answerList = list()
 
-    # 用列表格式化a,b,c..
+    # format the a,b,c.. with a list
 
     for key, value in answers.items():
         if key == symbols('a'):
@@ -374,21 +374,21 @@ def calEquation(A, expression, tzz, same_num, same_nums):
             answerList.append((key, value))
             human_answerList.append((key, value))
 
-    # 列表中添加变量x的值为A
+    # the variable for which x is added to the list is A
     answerList.append((symbols('x'), A))
     return (answerList, human_answerList)
 
 def pow_Matrix(A, n): 
-    tzz = A.eigenvals()  # "返回值为一个字典，特征值：根的重数"
-    rank = A.rank()  # 获得矩阵A的秩
-    yu_expression = getYuExpression(rank)  # 获得余数的表达式
+    tzz = A.eigenvals()  # "the return value is a dictionary，eigenvalue：the multiplicity of the roots"
+    rank = A.rank()  # get the rank of the matrix A
+    yu_expression = getYuExpression(rank)  # get the remainder expression
 
     same_num, same_nums = findSame(tzz)
     print('same_num:', same_num, '  same_nums:', same_nums)
 
     expression = symbols("x") ** n - yu_expression
     print(expression)
-    # 例如 记录了变量 a,b 的值
+    # record the value of the variable a,b 
     result = calEquation(A, expression, tzz, same_num, same_nums)
     answerList = result[0]
     human_answeList = result[1]
